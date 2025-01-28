@@ -14,14 +14,48 @@ if (USE_MBEDCRYPTO)
     set(ENABLE_PROGRAMS OFF CACHE BOOL "")
     set(ENABLE_TESTING OFF CACHE BOOL "") # disable mbedtls tests
     file(COPY mbedtls DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/patched)
-    execute_process(COMMAND patch -p1 -u
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/patched/mbedtls
-        INPUT_FILE ${CMAKE_CURRENT_SOURCE_DIR}/mbedtls-ed25519.patch)
-    if(${APPLE})
-        execute_process(COMMAND patch -p1 -u
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/patched/mbedtls
-            INPUT_FILE ${CMAKE_CURRENT_SOURCE_DIR}/mbedtls-apple.patch)
+    find_program(PATCH_PROGRAM patch)
+    if(NOT PATCH_PROGRAM)
+        if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+            find_program(PATCH_PROGRAM 
+                NAMES patch.exe
+                PATHS
+                    "C:\\Program Files\\Git\\usr\\bin"
+                    "C:\\Program Files (x86)\\Git\\usr\\bin"
+                    # "C:\\msys64\\usr\\bin"
+                    # "C:\\cygwin64\\bin"
+            )
+        endif()
     endif()
+    
+    
+    if(NOT PATCH_PROGRAM)
+        message(FATAL_ERROR "patch command not found! Please install Git for Windows or GNU patch")
+    endif()
+    
+    execute_process(
+        COMMAND "${PATCH_PROGRAM}" -p1 -u
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/patched/mbedtls"
+        INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/mbedtls-ed25519.patch"
+        RESULT_VARIABLE PATCH_RESULT
+    )
+    
+    if(NOT PATCH_RESULT EQUAL 0)
+        message(FATAL_ERROR "Patch failed with error: ${PATCH_RESULT}")
+    endif()
+    
+    if(APPLE)
+        execute_process(
+            COMMAND "${PATCH_PROGRAM}" -p1 -u
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/patched/mbedtls"
+            INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/mbedtls-apple.patch"
+            RESULT_VARIABLE PATCH_RESULT
+        )
+        
+        if(NOT PATCH_RESULT EQUAL 0)
+            message(FATAL_ERROR "Apple patch failed with error: ${PATCH_RESULT}")
+        endif()
+    endif()    
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/patched/mbedtls)
 endif (USE_MBEDCRYPTO)
 
